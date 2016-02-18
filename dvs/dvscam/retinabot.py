@@ -1,7 +1,7 @@
 from . import dvscam
 import numpy as np
 import threading
-import time
+import time #TODO: time.time() isn't very accurate, use timeit instead
 import cPickle as pickle
 import signal
 import sys
