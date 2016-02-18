@@ -36,5 +36,22 @@ class Socket(object):
     def close(self):
         self.socket.close()
 
-
+import cPickle as pickle
+import time
+class Recording(object):
+    def __init__(self, fname):
+        self.data = pickle.load(open(fname, 'rb'))
+        self.start_time = time.time()
+        self.time_elapsed = 0
+        self.index = 0 # current index into the data list
+    def send(self, message):
+        pass
+    def receive(self):
+        if time.time() - self.start_time >= self.data[self.index][0]:
+            self.index += 1
+            return self.data[self.index-1][1]
+        else:
+            return ''
+    def close(self):
+        pass
 

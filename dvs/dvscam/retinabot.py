@@ -1,7 +1,10 @@
 from . import dvscam
 import numpy as np
 import threading
-
+import time
+import cPickle as pickle
+import signal
+import sys
 
 
 class RetinaBot(dvscam.NSTBot):
@@ -27,6 +30,15 @@ class RetinaBot(dvscam.NSTBot):
         self.add_sensor('compass', bit=9, range=4096, length=3)
         self.add_sensor('temperature', bit=10, range=1, length=1)
         self.add_sensor('quaternion', bit=11, range=1, length=4)
+        #signal.signal(signal.SIGUSR1, self.close)
+
+    def close(self):
+        """ Save data if recording, and then close everything """
+        if self.recording:
+            pickle.dump(self.events, open(self.recfile, 'wb'))
+        self.disconnect()
+        sys.exit()
+
 
     def add_sensor(self, name, bit, range, length):
         value = np.zeros(length)
@@ -55,8 +67,14 @@ class RetinaBot(dvscam.NSTBot):
         thread.start()
 
     def disconnect(self):
+        if self.recording:
+            pickle.dump(self.events, open(self.recfile, 'wb'))
         self.retina(False)
         super(RetinaBot, self).disconnect()
+
+    def record(self, filename):
+        self.recfile = filename
+        self.recording = True
 
     def retina(self, active, bytes_in_timestamp=4):
         if active:
@@ -129,10 +147,31 @@ class RetinaBot(dvscam.NSTBot):
         """Handle all data coming from the robot."""
         old_data = None
         buffered_ascii = ''
+
+        if self.recording:
+            """
+            #f = open(self.recfile, 'wb')
+            old_time = time.time()
+            """
+            start_time = time.time()
+
+
         while True:
             packet_size = self.retina_packet_size
             # grab the new data
             data = self.connection.receive()
+
+            # record the data for future replay
+            if self.recording and data != '':
+                """
+                new_time = time.time()
+                delay = new_time - old_time
+                #f.write(str(delay)+'\n')
+                #f.write(str(data)+'\n')
+                self.events.append((delay, data))
+                old_time = new_time
+                """
+                self.events.append((time.time() - start_time, data))
 
             # combine it with any leftover data from last time through the loop
             if old_data is not None:

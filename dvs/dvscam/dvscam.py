@@ -6,6 +6,8 @@ from . import connection
 class NSTBot(object):
     def __init__(self):
         self.connection = None
+        self.recording = False
+        self.events = [] # a list recording all events to be saved
 
     def connect(self, connection):
         self.connection = connection
