@@ -223,6 +223,9 @@ class PosecellNetwork(object):
         self.pc_c_size_th = 2 * np.pi / self.pc_dim_th
         self.posecells = np.zeros((self.pc_dim_xy, self.pc_dim_xy, self.pc_dim_th))
 
+        self.posecells[np.floor(PC_DIM_XY/2), 
+                       np.floor(PC_DIM_XY/2),
+                       np.floor(PC_DIM_TH/2)] = 1
         #TODO: a lot more stuff might be missing in here
 
     def get_current_exp_id(self):
@@ -401,6 +404,68 @@ class PosecellNetwork(object):
         self.best_y = y
         self.best_th = th
 
+    def find_best_new(self):
+
+        x, y, th = np.unravel_index(self.posecells.argmax(), self.posecells.shape)
+        mx = self.posecells[x,y,th]
+
+        # get the sums for each axis
+        x_sums = np.zeros(PC_DIM_XY)
+        y_sums = np.zeros(PC_DIM_XY)
+        z_sums = np.zeros(PC_DIM_TH)
+
+        for i in range(x - PC_CELLS_TO_AVG, x + PC_CELLS_TO_AVG + 1):
+            for j in range(y - PC_CELLS_TO_AVG, y + PC_CELLS_TO_AVG + 1):
+                for k in range(th - PC_CELLS_TO_AVG, th + PC_CELLS_TO_AVG + 1):
+                    # Use modulo for wrapping
+                    im = i % PC_DIM_XY
+                    jm = j % PC_DIM_XY
+                    km = k % PC_DIM_TH
+                    x_sums[im] += self.posecells[im ,jm, km]
+                    y_sums[jm] += self.posecells[im ,jm, km]
+                    z_sums[km] += self.posecells[im ,jm, km]
+
+        # now find the (x, y, th) using population vector decoding to handle the wrap around
+        sum_x1 = 0
+        sum_x2 = 0
+        sum_y1 = 0
+        sum_y2 = 0
+        
+        for i in range(PC_DIM_XY):
+            sum_x1 += PC_XY_SUM_SIN_LOOKUP[i] * x_sums[i]
+            sum_x2 += PC_XY_SUM_COS_LOOKUP[i] * x_sums[i]
+            sum_y1 += PC_XY_SUM_SIN_LOOKUP[i] * y_sums[i]
+            sum_y2 += PC_XY_SUM_COS_LOOKUP[i] * y_sums[i]
+
+        x = np.arctan2(sum_x1, sum_x2) * PC_DIM_XY / (2.0 * np.pi) - 1.0
+        while x < 0:
+            x += PC_DIM_XY
+        while x > PC_DIM_XY:
+            x -= PC_DIM_XY
+
+        y = np.arctan2(sum_y1, sum_y2) * PC_DIM_XY / (2.0 * np.pi) - 1.0
+        while y < 0:
+            y += PC_DIM_XY
+        while x > PC_DIM_XY:
+            y -= PC_DIM_XY
+
+        sum_x1 = 0
+        sum_x2 = 0
+        for i in range(PC_DIM_TH):
+            sum_x1 += PC_TH_SUM_SIN_LOOKUP[i] * z_sums[i]
+            sum_x2 += PC_TH_SUM_COS_LOOKUP[i] * z_sums[i]
+
+        th = np.arctan2(sum_x1, sum_x2) * PC_DIM_TH / (2.0 * np.pi) - 1.0
+        while th < 0:
+            th += PC_DIM_TH
+        while x > PC_DIM_TH:
+            th -= PC_DIM_TH
+
+        self.best_x = x
+        self.best_y = y
+        self.best_th = th
+        
+
     def get_action(self):
 
         delta_pc = 0
@@ -468,16 +533,17 @@ class PosecellNetwork(object):
                     self.create_experience()
                     action = CREATE_NODE
 
-
         return action
 
     def get_delta_pc(self, x, y, th):
 
         pc_th_corrected = self.best_th - self.vt_delta_pc_th
+        
         if pc_th_corrected < 0:
             pc_th_corrected += PC_DIM_TH
         if pc_th_corrected >= PC_DIM_TH:
             pc_th_corrected -= PC_DIM_TH
+        
         return np.sqrt(self.get_min_delta(self.best_x, x, PC_DIM_XY)**2 +\
                        self.get_min_delta(self.best_y, y, PC_DIM_XY)**2 +\
                        self.get_min_delta(self.best_th, th, PC_DIM_TH)**2
