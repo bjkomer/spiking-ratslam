@@ -214,7 +214,9 @@ class PosecellNetwork(object):
                'th_pc': self.best_th,
                'vt_id': self.current_vt}
         self.experiences.append(exp)
-        pcvt['exps'].append(exp) #TODO: make sure this is doing the referencing properly
+        # Set the current experience to be the index of the latest experience
+        self.current_exp = len(self.experiences)-1
+        pcvt['exps'].append(self.current_exp) #TODO: make sure this is doing the referencing properly
 
     def pose_cell_builder(self):
 
@@ -410,7 +412,7 @@ class PosecellNetwork(object):
         else:
             return action # NO_ACTION
 
-        if len(self.view_templates) == 0:
+        if len(self.visual_templates) == 0:
             return action # NO_ACTION
         
         if len(self.experiences) == 0:
@@ -419,7 +421,7 @@ class PosecellNetwork(object):
         else:
             experience = self.experiences[self.current_exp]
 
-            delta_pc = self.get_delta_pc(experience['x_px'], experience['y_pc'], experience['theta_pc'])
+            delta_pc = self.get_delta_pc(experience['x_pc'], experience['y_pc'], experience['th_pc'])
 
             pcvt = self.visual_templates[self.current_vt]
 
@@ -430,7 +432,8 @@ class PosecellNetwork(object):
                 # go through all the exps associated with the current view and find the one with the closest delta_pc
                 matched_exp_id = -1
                 min_delta_id = -1
-                min_delta = int('infinity')
+                #min_delta = int('infinity')
+                min_delta = 100000 # should be very large number
                 #delta_pc_tmp??
 
                 # find the closest experience in cell space
@@ -467,6 +470,22 @@ class PosecellNetwork(object):
 
 
         return action
+
+    def get_delta_pc(self, x, y, th):
+
+        pc_th_corrected = self.best_th - self.vt_delta_pc_th
+        if pc_th_corrected < 0:
+            pc_th_corrected += PC_DIM_TH
+        if pc_th_corrected >= PC_DIM_TH:
+            pc_th_corrected -= PC_DIM_TH
+        return np.sqrt(self.get_min_delta(self.best_x, x, PC_DIM_XY)**2 +\
+                       self.get_min_delta(self.best_y, y, PC_DIM_XY)**2 +\
+                       self.get_min_delta(self.best_th, th, PC_DIM_TH)**2
+                      )
+
+    def get_min_delta(self, d1, d2, mx):
+        absval = abs(d1 - d2)
+        return min(absval, mx - absval)
 
 
 
