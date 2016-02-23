@@ -7,6 +7,8 @@ from sensor_msgs.msg import Image, CompressedImage
 from nav_msgs.msg import Odometry
 from ratslam_ros.msg import ViewTemplate, TopologicalAction
 import cv2
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 # TopologicalAction values
 NO_ACTION=0
@@ -15,7 +17,7 @@ CREATE_EDGE=2
 SET_NODE=3
 
 # Global Contants #TODO: fix the code to use these constants instead of attributes
-PC_DIM_XY=21
+PC_DIM_XY=11#21
 PC_DIM_TH=36
 PC_W_E_DIM=7
 PC_W_I_DIM=5
@@ -23,8 +25,8 @@ PC_W_E_VAR=1
 PC_W_I_VAR=2
 PC_GLOBAL_INHIB=0.00002
 VT_ACTIVE_DECAY=1.0
-PC_VT_INJECT_ENERGY=0.15
-PC_CELL_X_SIZE=1.0
+PC_VT_INJECT_ENERGY=0.1#0.15
+PC_CELL_X_SIZE=0.015#1.0
 EXP_DELTA_PC_THRESHOLD=2.0
 PC_VT_RESTORE=0.05
 
@@ -86,6 +88,7 @@ class PosecellNetwork(object):
                                       )
 
         # Set up constant values
+        """
         self.pc_dim_xy = pc_dim_xy
         self.pc_dim_th = pc_dim_th
         self.pc_w_e_dim = pc_w_e_dim
@@ -98,11 +101,12 @@ class PosecellNetwork(object):
         self.pc_cell_x_size = pc_cell_x_size
         self.exp_delta_pc_threshold = exp_delta_pc_threshold
         self.pc_vt_restore = pc_vt_restore
+        """
 
         # Starting postion within the posecell network
-        self.best_x = np.floor(self.pc_dim_xy / 2.0)
-        self.best_y = np.floor(self.pc_dim_xy / 2.0)
-        self.best_th = np.floor(self.pc_dim_th / 2.0)
+        self.best_x = np.floor(PC_DIM_XY / 2.0)
+        self.best_y = np.floor(PC_DIM_XY / 2.0)
+        self.best_th = np.floor(PC_DIM_TH / 2.0)
 
         # Initialize variables
         self.current_exp = 0
@@ -129,7 +133,8 @@ class PosecellNetwork(object):
 
         self.pc_output.src_id = self.get_current_exp_id()
 
-        self.on_odo(vtrans*time_diff, vrot*time_diff)
+        #self.on_odo(vtrans*time_diff, vrot*time_diff)
+        self.on_odo(vtrans, vrot) #FIXME: removing time diff multiplication for now
         self.pc_output.action = self.get_action()
         
         # Only publish a message if there is an action
@@ -153,6 +158,7 @@ class PosecellNetwork(object):
         self.path_integration(vtrans, vrot)
         self.find_best()
         self.odo_update = True
+        self.display = np.copy(self.posecells)
 
     def template_callback(self, vt):
 
@@ -170,26 +176,26 @@ class PosecellNetwork(object):
             # this prevents energy injected in recently created vt's
             if vt < len(self.visual_templates) - 10:
                 if vt == self.current_vt:
-                    pcvt['decay'] += self.vt_active_decay
+                    pcvt['decay'] += VT_ACTIVE_DECAY
 
                 # magic line that michael knows about
-                energy = self.pc_vt_inject_energy * 1.0 / 30.0 * (30.0 - np.exp(1.2 * pcvt['decay']))
+                energy = PC_VT_INJECT_ENERGY * 1.0 / 30.0 * (30.0 - np.exp(1.2 * pcvt['decay']))
 
                 if energy > 0:
-                    self.vt_delta_pc_th = vt_rad / (2.0*np.pi) * self.pc_dim_th
-                    pc_th_corrected = pcvt['pc_th'] + vt_rad / (2.0*np.pi) * self.pc_dim_th
+                    self.vt_delta_pc_th = vt_rad / (2.0*np.pi) * PC_DIM_TH
+                    pc_th_corrected = pcvt['pc_th'] + vt_rad / (2.0*np.pi) * PC_DIM_TH
                     if pc_th_corrected < 0:
-                        pc_th_corrected += self.pc_dim_th
-                    if pc_th_corrected >= self.pc_dim_th:
-                        pc_th_corrected -= self.pc_dim_th
+                        pc_th_corrected += PC_DIM_TH
+                    if pc_th_corrected >= PC_DIM_TH:
+                        pc_th_corrected -= PC_DIM_TH
 
                     # Inject energy into the posecell network
                     self.inject(pcvt['pc_x'], pcvt['pc_y'], pc_th_corrected, energy)
 
         for visual_template in self.visual_templates:
-            visual_template['decay'] -= self.pc_vt_restore
-            if visual_template['decay'] < self.vt_active_decay:
-                visual_template['decay'] = self.vt_active_decay
+            visual_template['decay'] -= PC_VT_RESTORE
+            if visual_template['decay'] < VT_ACTIVE_DECAY:
+                visual_template['decay'] = VT_ACTIVE_DECAY
 
         self.prev_vt = self.current_vt
         self.current_vt = vt
@@ -201,7 +207,7 @@ class PosecellNetwork(object):
         pcvt = {'pc_x': self.best_x,
                 'pc_y': self.best_y,
                 'pc_th': self.best_th,
-                'decay': self.vt_active_decay,
+                'decay': VT_ACTIVE_DECAY,
                 'exps':[]}
 
         self.visual_templates.append(pcvt)
@@ -220,12 +226,16 @@ class PosecellNetwork(object):
 
     def pose_cell_builder(self):
 
-        self.pc_c_size_th = 2 * np.pi / self.pc_dim_th
-        self.posecells = np.zeros((self.pc_dim_xy, self.pc_dim_xy, self.pc_dim_th))
+        self.pc_c_size_th = 2 * np.pi / PC_DIM_TH
+        self.posecells = np.zeros((PC_DIM_XY, PC_DIM_XY, PC_DIM_TH))
 
         self.posecells[np.floor(PC_DIM_XY/2), 
                        np.floor(PC_DIM_XY/2),
                        np.floor(PC_DIM_TH/2)] = 1
+
+        # Separate copy for display purposes, so no intermediate steps are displayed
+        self.display = np.copy(self.posecells)
+        
         #TODO: a lot more stuff might be missing in here
 
     def get_current_exp_id(self):
@@ -234,11 +244,11 @@ class PosecellNetwork(object):
 
     def get_relative_rad(self):
 
-        return self.vt_delta_pc_th * 2.0 * np.pi / self.pc_dim_th
+        return self.vt_delta_pc_th * 2.0 * np.pi / PC_DIM_TH
 
     def inject(self, act_x, act_y, act_z, energy):
 
-        if ((act_x < self.pc_dim_xy) & (act_x >= 0) & (act_y < self.pc_dim_xy) & (act_y >= 0) & (act_z < self.pc_dim_th) & (act_z >= 0)):
+        if ((act_x < PC_DIM_XY) & (act_x >= 0) & (act_y < PC_DIM_XY) & (act_y >= 0) & (act_z < PC_DIM_TH) & (act_z >= 0)):
             self.posecells[act_x, act_y, act_z] += energy
         return True
     
@@ -559,4 +569,78 @@ class PosecellNetwork(object):
 
 if __name__ == '__main__':
     posecells = PosecellNetwork()
-    rospy.spin()
+    #rospy.spin()
+
+    # Set up figure to view posecell image
+    pc_fig = plt.figure(1)
+    pc_ax = pc_fig.add_subplot(111)
+    pc_ax.set_title("Pose Cell Activity in X-Y")
+    pc_im = pc_ax.imshow(np.zeros((PC_DIM_XY, PC_DIM_XY)),
+                                   #vmax=255, vmin=-255,
+                                   vmax=1, vmin=0,
+                                   cmap=plt.cm.gray) # Blank starting image
+    pc_fig.show()
+    pc_fig.canvas.draw()
+
+    # Set up 3D plot to view the maximum posecell
+    mx_fig = plt.figure(2)
+    mx_ax = mx_fig.add_subplot(111, projection='3d')
+    mx_ax.set_title("Max Pose Cell")
+    """
+    mx_scatter = mx_ax.scatter(xs=[np.floor(PC_DIM_XY/2)], 
+                       ys=[np.floor(PC_DIM_XY/2)], 
+                       zs=[np.floor(PC_DIM_TH/2)],
+                          s=2)
+    """
+    """
+    mx_scatter = mx_ax.plot3D([np.floor(PC_DIM_XY/2)],
+                              [np.floor(PC_DIM_XY/2)],
+                              [np.floor(PC_DIM_TH/2)],'mo')
+    """
+    mx_p = []
+    x = np.floor(PC_DIM_XY/2)
+    y = np.floor(PC_DIM_XY/2)
+    th = np.floor(PC_DIM_TH/2)
+    mx_p.append(mx_ax.plot3D([0, PC_DIM_XY], [y, y], [th, th], 'K'))
+    mx_p.append(mx_ax.plot3D([x, x], [0, PC_DIM_XY], [th, th], 'K'))
+    mx_p.append(mx_ax.plot3D([x, x], [y, y], [0, PC_DIM_TH], 'K'))
+    mx_p.append(mx_ax.plot3D([x], [y], [th], 'mo'))
+    
+    mx_ax.set_xlim3d([0, PC_DIM_XY])
+    mx_ax.set_ylim3d([0, PC_DIM_XY])
+    mx_ax.set_zlim3d([0, PC_DIM_TH])
+    mx_ax.set_autoscale_on( False )
+    mx_fig.show()
+    mx_fig.canvas.draw()
+
+
+    while not rospy.is_shutdown():
+        pc_im.set_data(np.sum(posecells.display,axis=2))
+        pc_fig.canvas.draw()
+        """
+        mx_scatter.remove()
+        mx_scatter = mx_ax.scatter(xs=[posecells.best_x], 
+                       ys=[posecells.best_y], 
+                       zs=[posecells.best_th],
+                      s=2)
+        """
+        # Draw lines to help see things in 3D
+        #mx_fig.clf()
+        for p in mx_p:
+            p[0].remove()
+        mx_p = []
+        x = posecells.best_x
+        y = posecells.best_y
+        th = posecells.best_th
+        mx_p.append(mx_ax.plot3D([0, PC_DIM_XY], [y, y], [th, th], 'K'))
+        mx_p.append(mx_ax.plot3D([x, x], [0, PC_DIM_XY], [th, th], 'K'))
+        mx_p.append(mx_ax.plot3D([x, x], [y, y], [0, PC_DIM_TH], 'K'))
+        mx_p.append(mx_ax.plot3D([x], [y], [th], 'mo'))
+        """
+        mx_ax.plot3D([0, PC_DIM_XY], [y, y], [th, th], 'K')
+        mx_ax.plot3D([x, x], [0, PC_DIM_XY], [th, th], 'K')
+        mx_ax.plot3D([x, x], [y, y], [0, PC_DIM_TH], 'K')
+        #mx_scatter = mx_ax.plot3D([x], [y], [th], 'mo')
+        mx_scatter[0].set_data([x], [y], [th])
+        """
+        mx_fig.canvas.draw()
