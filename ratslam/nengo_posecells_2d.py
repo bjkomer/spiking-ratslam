@@ -2,6 +2,7 @@
 #NOTE: nodes shouldn't be allowed to go negative, this might be breaking things
 import nengo
 import numpy as np
+from functools import partial
 
 PC_DIM_XY=5#11
 PC_DIM_TH=5#36
@@ -17,6 +18,16 @@ WEIGHT_OFFSET = np.floor(WEIGHT_DIM/2.)
 NORMALIZATION_THRESHOLD = 1
 def pseudonormalize(x):
     return NORMALIZATION_THRESHOLD - x#x[0]
+
+# treat negative values as zero
+def weight_transform(x, weight):
+    return np.max(0, x)*weight
+
+def transform_generator(weight):
+    def wt(x):
+        return np.max(0, x)*weight
+        #return x*weight
+    return wt
 
 # A kernel of weights for the connection strength between neurons of a given separation
 weight_kernel = np.zeros((WEIGHT_DIM, WEIGHT_DIM, WEIGHT_DIM))
@@ -36,11 +47,14 @@ weight_kernel_right = np.array([[-.1,-.1,.3],
                                 [-.1,-.1,.3]
                                ])
 # Make the kernel have 0 mean so things don't explode
+weight_kernel = weight_kernel_left
 weight_kernel -= np.mean(weight_kernel)
-weight_kernel -= .002 # global inhibition
+#weight_kernel -= .002 # global inhibition
 print(weight_kernel)
+PSTC=1.0
 model = nengo.Network('Posecells', seed=13)
 
+model.config[nengo.Ensemble].neuron_type = nengo.Direct()
 with model:
     # Create a 2D array of ensembles for the posecells
     posecells = np.empty( (PC_DIM_XY, PC_DIM_XY), dtype=object)
@@ -48,7 +62,8 @@ with model:
         for j in range(PC_DIM_XY):
             posecells[i,j] = nengo.Ensemble(n_neurons=N_NEURONS,
                                             dimensions=1,
-                                            label="[%i,%i]"%(i,j)
+                                            label="[%i,%i]"%(i,j),
+                                            eval_points = nengo.dists.Uniform(low=0, high=1)
                                            )
     
     # Connect all of the ensembles to the neighboring ones with specific weights
@@ -63,8 +78,13 @@ with model:
                                      posecells[(i + x - WEIGHT_OFFSET) % PC_DIM_XY,
                                                (j + y - WEIGHT_OFFSET) % PC_DIM_XY,
                                               ],
-                                     transform = weight_kernel[x, y])
-
+                                     #transform = weight_kernel[x, y],
+                                     function=partial(weight_transform,
+                                                      weight=weight_kernel[x,y]),
+                                     #function=transform_generator(weight_kernel[x,y]),
+                                     synapse=PSTC
+                                    )
+    """
     # computes the sum of all activities, used for pseudonormalization
     # TODO: could also skip this population, and have this done directly through
     # connections, and possibly putting everything into one ensemble
@@ -74,7 +94,7 @@ with model:
             nengo.Connection(posecells[i, j], summation)
             nengo.Connection(summation, posecells[i, j],
                              function=pseudonormalize)
-
+    """
     # Computes the average position of the activity in the network 
     position = nengo.Ensemble(n_neurons=1, dimensions=2,
                               neuron_type=nengo.Direct())
