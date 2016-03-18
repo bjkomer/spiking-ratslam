@@ -1,7 +1,10 @@
 # Posecell Network using function space representation
+# TODO: inject some energy in the middle initially to get it started
+# TODO: on the inject function, also output a magnitude, which decays over time
 
 import nengo
 import numpy as np
+import time
 
 import nengo.utils.function_space
 nengo.dists.Function = nengo.utils.function_space.Function
@@ -182,24 +185,26 @@ with model:
     nengo.Connection(posecells_y, posecells_y[:-1], synapse=0.1, function=collapse)
     nengo.Connection(posecells_th, posecells_th[:-1], synapse=0.1, function=collapse)
 
-    v_trans_rot = nengo.Node([0,0]) # linear (forward) and rotational velocity
-    
     # velocity in x and y directions, and current theta.
     velocity_input = nengo.Ensemble(n_neurons=500, dimensions=3) 
     
-    nengo.Connection(v_trans_rot, velocity_input[:2])
     nengo.Connection(velocity_input, posecells_x[-1], function=x_component)
     nengo.Connection(velocity_input, posecells_y[-1], function=y_component)
-    nengo.Connection(v_trans_rot[1], posecells_th[-1])
     
     stim_control_x = nengo.Node([1,0,0.2])
-    nengo.Connection(stim_control_x, stimulus_x)
+    stim_x = nengo.Ensemble(n_neurons=300, dimensions=3)
+    nengo.Connection(stim_control_x[2], stim_x[2])
+    nengo.Connection(stim_x, stimulus_x)
     
     stim_control_y = nengo.Node([1,0,0.2])
-    nengo.Connection(stim_control_y, stimulus_y)
+    stim_y = nengo.Ensemble(n_neurons=300, dimensions=3)
+    nengo.Connection(stim_control_y[2], stim_y[2])
+    nengo.Connection(stim_y, stimulus_y)
     
     stim_control_th = nengo.Node([1,0,0.2])
-    nengo.Connection(stim_control_th, stimulus_th)
+    stim_th = nengo.Ensemble(n_neurons=300, dimensions=3)
+    nengo.Connection(stim_control_th[2], stim_th[2])
+    nengo.Connection(stim_th, stimulus_th)
 
     max_x = nengo.Ensemble(n_neurons=100, dimensions=1)
     max_y = nengo.Ensemble(n_neurons=100, dimensions=1)
@@ -215,9 +220,27 @@ with model:
     nengo.Connection(max_y, posecell_node[1])
     nengo.Connection(max_th, posecell_node[2])
 
-    nengo.Connection(posecell_node[0], v_trans_rot[0])
-    nengo.Connection(posecell_node[1], v_trans_rot[1])
+    nengo.Connection(posecell_node[0], velocity_input[0])
+    nengo.Connection(posecell_node[1], velocity_input[1])
+    nengo.Connection(posecell_node[1], posecells_th[-1])
 
-    nengo.Connection(posecell_node[2], stim_control_x[1])
-    nengo.Connection(posecell_node[3], stim_control_y[1])
-    nengo.Connection(posecell_node[4], stim_control_th[1])
+    nengo.Connection(posecell_node[2], stim_x[1])
+    nengo.Connection(posecell_node[3], stim_y[1])
+    nengo.Connection(posecell_node[4], stim_th[1])
+
+
+
+print( "starting simulator..." )
+before = time.time()
+
+sim = nengo.Simulator(model)
+
+after = time.time()
+print( "time to build:" )
+print( after - before )
+
+print( "running simulator..." )
+before = time.time()
+
+while True:
+    sim.step()

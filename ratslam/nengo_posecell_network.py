@@ -1,9 +1,24 @@
-from nengo_posecells import Posecells
+#from nengo_posecells import Posecells
 from posecell_network import PosecellNetwork
 import rospy
 import numpy as np
 
+PC_DIM_XY=11#21
+PC_DIM_TH=36
+
 class NengoPosecellNetwork(PosecellNetwork):
+
+    def __init__(self):
+        self.vtrans = 0
+        self.vrot = 0
+        self.stim_x = 0
+        self.stim_y = 0
+        self.stim_th = 0
+        self.best_x = 0
+        self.best_y = 0
+        self.best_th = 0
+
+        super(NengoPosecellNetwork, self).__init__()
 
     def pose_cell_builder(self):
 
@@ -21,6 +36,7 @@ class NengoPosecellNetwork(PosecellNetwork):
 
         self.vtrans = vtrans
         self.vrot = vrot
+        self.odo_update = True
         """
     def excite(self):
 
