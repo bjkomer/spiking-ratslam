@@ -11,7 +11,7 @@ nengo.FunctionSpace = nengo.utils.function_space.FunctionSpace
 domain_min = -1
 domain_max = 1
 domain_range = domain_max - domain_min
-domain_points = 2000
+domain_points = 200
 x_domain = np.linspace(domain_min, domain_max, domain_points)
 y_domain = np.linspace(domain_min, domain_max, domain_points)
 domain = np.meshgrid(x_domain, y_domain)
@@ -44,7 +44,7 @@ fs = nengo.FunctionSpace(nengo.dists.Function(gaussian2d,
 model = nengo.Network(seed=13)
 model.config[nengo.Ensemble].neuron_type = nengo.Direct() #TODO: temp, just use direct for debugging
 with model:
-    posecells = nengo.Ensemble(n_neurons=3000, dimensions=fs.n_basis + 2)
+    posecells = nengo.Ensemble(n_neurons=2000, dimensions=fs.n_basis + 2)
     posecells.encoders = nengo.dists.Combined([fs.project(nengo.dists.Function(gaussian2d,
                                         mean_x=nengo.dists.Uniform(domain_min,
                                                                    domain_max),
