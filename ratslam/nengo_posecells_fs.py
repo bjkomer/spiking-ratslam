@@ -244,3 +244,4 @@ before = time.time()
 
 while True:
     sim.step()
+    time.sleep(0.0001)

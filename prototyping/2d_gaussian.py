@@ -8,27 +8,47 @@ nengo.dists.Function = nengo.utils.function_space.Function
 nengo.dists.Combined = nengo.utils.function_space.Combined
 nengo.FunctionSpace = nengo.utils.function_space.FunctionSpace
 
+n_basis=10
+n_samples=1000
 domain_min = -1
 domain_max = 1
 domain_range = domain_max - domain_min
-domain_points = 200
+domain_points = 5#20#200
 x_domain = np.linspace(domain_min, domain_max, domain_points)
 y_domain = np.linspace(domain_min, domain_max, domain_points)
-domain = np.meshgrid(x_domain, y_domain)
-
+vx_domain, vy_domain = np.meshgrid(x_domain, y_domain)
 def gaussian2d(mag, mean_x, mean_y, std):
-    y_offset = np.array([0, domain_range]).reshape((2,1,1))
-    x_offset = np.array([domain_range, 0]).reshape((2,1,1))
-    mean = np.array([mean_x, mean_y]).reshape((2,1,1))
+    #y_offset = np.array([0, domain_range]).reshape((2,1,1))
+    #x_offset = np.array([domain_range, 0]).reshape((2,1,1))
+    y_offset = domain_range
+    x_offset = domain_range
+    #mean = np.array([mean_x, mean_y]).reshape((2,1,1))
     try:
+        """
+        print((mag * ( np.exp(-(vx_domain - mean_x)**2 / (2 * std**2)) +\
+                       np.exp(-(vy_domain - mean_y)**2 / (2 * std**2)) +\
+                       np.exp(-(vx_domain - mean_x - x_offset)**2 / (2 * std**2)) +\
+                       np.exp(-(vx_domain - mean_x + x_offset)**2 / (2 * std**2)) +\
+                       np.exp(-(vy_domain - mean_y - y_offset)**2 / (2 * std**2)) +\
+                       np.exp(-(vy_domain - mean_y + y_offset)**2 / (2 * std**2))
+                     )).shape)
+        """
         # Adding gaussians offset by the domain range to simulate cycling
+        return (mag * ( np.exp(-(vx_domain - mean_x)**2 / (2 * std**2)) +\
+                       np.exp(-(vy_domain - mean_y)**2 / (2 * std**2)) +\
+                       np.exp(-(vx_domain - mean_x - x_offset)**2 / (2 * std**2)) +\
+                       np.exp(-(vx_domain - mean_x + x_offset)**2 / (2 * std**2)) +\
+                       np.exp(-(vy_domain - mean_y - y_offset)**2 / (2 * std**2)) +\
+                       np.exp(-(vy_domain - mean_y + y_offset)**2 / (2 * std**2))
+                     )).flatten()
+        """
         return mag * ( np.exp(-(domain - mean)**2 / (2 * std**2)) +\
                        np.exp(-(domain - mean - x_offset)**2 / (2 * std**2)) +\
                        np.exp(-(domain - mean + x_offset)**2 / (2 * std**2)) +\
                        np.exp(-(domain - mean - y_offset)**2 / (2 * std**2)) +\
                        np.exp(-(domain - mean + y_offset)**2 / (2 * std**2))
                      )
-
+        """
     except FloatingPointError:
         return domain * 0
 
@@ -39,7 +59,7 @@ fs = nengo.FunctionSpace(nengo.dists.Function(gaussian2d,
                                                                          domain_max),
                                               std=nengo.dists.Uniform(.1, .7),
                                               mag=1),
-                         n_basis=10)
+                         n_basis=n_basis, n_samples=n_samples)
 
 model = nengo.Network(seed=13)
 model.config[nengo.Ensemble].neuron_type = nengo.Direct() #TODO: temp, just use direct for debugging
@@ -79,21 +99,25 @@ with model:
     #nengo.Connection(stimulus, plot[fs.n_basis:], synapse=0.1)
 
     def collapse(x):
-        pts = fs.reconstruct(x[:-1])
+        pts = fs.reconstruct(x[:-2])
         peak = np.argmax(pts)
         data = gaussian2d(mag=1, std=0.2, 
-                          mean_x=domain[peak][0],
-                          mean_y=domain[peak][1])
+                          mean_x=vx_domain[peak][0],
+                          mean_y=vy_domain[peak][1])
 
         shift_x = int(x[-2]*domain_points/4)
         shift_y = int(x[-1]*domain_points/4)
 
-        data = fs.project(np.roll(data, shift_x,axis=0))*1.0
-        data = fs.project(np.roll(data, shift_y,axis=1))*1.1
+        data2d = data.reshape((domain_points, domain_points))
+
+        data2d = np.roll(data2d, shift_x, axis=0)
+        data2d = np.roll(data2d, shift_y, axis=1)
+        data = fs.project(data2d.flatten())*1.1
+
         return data
     
     def collapse2(x):
-        pts = fs.reconstruct(x[:-1])
+        pts = fs.reconstruct(x[:-2])
         peak = np.argmax(pts)
         data = gaussian2d(mag=1, std=0.2, 
                           mean_x=domain[peak][0],

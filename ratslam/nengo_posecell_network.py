@@ -5,6 +5,7 @@ import numpy as np
 
 PC_DIM_XY=11#21
 PC_DIM_TH=36
+PC_CELL_X_SIZE=0.015#1.0
 
 class NengoPosecellNetwork(PosecellNetwork):
 
@@ -27,14 +28,14 @@ class NengoPosecellNetwork(PosecellNetwork):
     def inject(self, act_x, act_y, act_z, energy):
 
         if ((act_x < PC_DIM_XY) & (act_x >= 0) & (act_y < PC_DIM_XY) & (act_y >= 0) & (act_z < PC_DIM_TH) & (act_z >= 0)):
-            self.stim_x = ( act_x / PC_DIM_XY * 2 ) - 1
-            self.stim_y = ( act_y / PC_DIM_XY * 2 ) - 1
-            self.stim_th = ( act_z / PC_DIM_XY * 2 ) - np.pi
+            self.stim_x = (( act_x / PC_DIM_XY * 2 ) - 1) * energy
+            self.stim_y = (( act_y / PC_DIM_XY * 2 ) - 1) * energy
+            self.stim_th = (( act_z / PC_DIM_XY * 2 ) - np.pi) * energy
         return True
 
     def on_odo(self, vtrans, vrot):
 
-        self.vtrans = vtrans
+        self.vtrans = vtrans * (PC_DIM_XY / PC_CELL_X_SIZE)
         self.vrot = vrot
         self.odo_update = True
         """
