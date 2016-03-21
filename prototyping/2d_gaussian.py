@@ -8,12 +8,12 @@ nengo.dists.Function = nengo.utils.function_space.Function
 nengo.dists.Combined = nengo.utils.function_space.Combined
 nengo.FunctionSpace = nengo.utils.function_space.FunctionSpace
 
-n_basis=10
+n_basis=20
 n_samples=1000
 domain_min = -1
 domain_max = 1
 domain_range = domain_max - domain_min
-domain_points = 5#20#200
+domain_points = 75#200
 x_domain = np.linspace(domain_min, domain_max, domain_points)
 y_domain = np.linspace(domain_min, domain_max, domain_points)
 vx_domain, vy_domain = np.meshgrid(x_domain, y_domain)
@@ -24,33 +24,37 @@ def gaussian2d(mag, mean_x, mean_y, std):
     x_offset = domain_range
     #mean = np.array([mean_x, mean_y]).reshape((2,1,1))
     try:
-        """
-        print((mag * ( np.exp(-(vx_domain - mean_x)**2 / (2 * std**2)) +\
-                       np.exp(-(vy_domain - mean_y)**2 / (2 * std**2)) +\
-                       np.exp(-(vx_domain - mean_x - x_offset)**2 / (2 * std**2)) +\
-                       np.exp(-(vx_domain - mean_x + x_offset)**2 / (2 * std**2)) +\
-                       np.exp(-(vy_domain - mean_y - y_offset)**2 / (2 * std**2)) +\
-                       np.exp(-(vy_domain - mean_y + y_offset)**2 / (2 * std**2))
-                     )).shape)
-        """
         # Adding gaussians offset by the domain range to simulate cycling
-        return (mag * ( np.exp(-(vx_domain - mean_x)**2 / (2 * std**2)) +\
-                       np.exp(-(vy_domain - mean_y)**2 / (2 * std**2)) +\
-                       np.exp(-(vx_domain - mean_x - x_offset)**2 / (2 * std**2)) +\
-                       np.exp(-(vx_domain - mean_x + x_offset)**2 / (2 * std**2)) +\
-                       np.exp(-(vy_domain - mean_y - y_offset)**2 / (2 * std**2)) +\
-                       np.exp(-(vy_domain - mean_y + y_offset)**2 / (2 * std**2))
+        return (mag * ( np.exp(-((vx_domain - mean_x)**2 / (2 * std**2) +\
+                                (vy_domain - mean_y)**2 / (2 * std**2))) +\
+
+                       np.exp(-((vx_domain - mean_x - x_offset)**2 / (2 * std**2) +\
+                               (vy_domain - mean_y)**2 / (2 * std**2))) +\
+
+                       np.exp(-((vx_domain - mean_x + x_offset)**2 / (2 * std**2) +\
+                               (vy_domain - mean_y)**2 / (2 * std**2))) +\
+
+                       np.exp(-((vx_domain - mean_x)**2 / (2 * std**2) +\
+                               (vy_domain - mean_y - y_offset)**2 / (2 * std**2))) +\
+
+                       np.exp(-((vx_domain - mean_x)**2 / (2 * std**2) +\
+                               (vy_domain - mean_y + y_offset)**2 / (2 * std**2))) +\
+                       
+                       np.exp(-((vx_domain - mean_x - x_offset)**2 / (2 * std**2) +\
+                               (vy_domain - mean_y - y_offset)**2 / (2 * std**2))) +\
+                       
+                       np.exp(-((vx_domain - mean_x - x_offset)**2 / (2 * std**2) +\
+                               (vy_domain - mean_y + y_offset)**2 / (2 * std**2))) +\
+                       
+                       np.exp(-((vx_domain - mean_x + x_offset)**2 / (2 * std**2) +\
+                               (vy_domain - mean_y - y_offset)**2 / (2 * std**2))) +\
+                       
+                       np.exp(-((vx_domain - mean_x + x_offset)**2 / (2 * std**2) +\
+                               (vy_domain - mean_y + y_offset)**2 / (2 * std**2)))
+
                      )).flatten()
-        """
-        return mag * ( np.exp(-(domain - mean)**2 / (2 * std**2)) +\
-                       np.exp(-(domain - mean - x_offset)**2 / (2 * std**2)) +\
-                       np.exp(-(domain - mean + x_offset)**2 / (2 * std**2)) +\
-                       np.exp(-(domain - mean - y_offset)**2 / (2 * std**2)) +\
-                       np.exp(-(domain - mean + y_offset)**2 / (2 * std**2))
-                     )
-        """
     except FloatingPointError:
-        return domain * 0
+        return (vx_domain * 0).flatten()
 
 fs = nengo.FunctionSpace(nengo.dists.Function(gaussian2d,
                                               mean_x=nengo.dists.Uniform(domain_min,
@@ -93,17 +97,18 @@ with model:
     stimulus = fs.make_stimulus_node(gaussian2d, 4)
     nengo.Connection(stimulus, posecells[:-2])
 
-    #plot = fs.make_plot_node(domain=domain, lines=2, n_pts=50)
+    # plot node uses only one linear domain, and x and y are the same
+    plot = fs.make_2Dplot_node(domain=x_domain)
 
-    #nengo.Connection(posecells[:-1], plot[:fs.n_basis], synapse=0.1)
+    nengo.Connection(posecells[:-2], plot[:fs.n_basis], synapse=0.1)
     #nengo.Connection(stimulus, plot[fs.n_basis:], synapse=0.1)
 
     def collapse(x):
         pts = fs.reconstruct(x[:-2])
         peak = np.argmax(pts)
         data = gaussian2d(mag=1, std=0.2, 
-                          mean_x=vx_domain[peak][0],
-                          mean_y=vy_domain[peak][1])
+                          mean_x=vx_domain.flatten()[peak],
+                          mean_y=vy_domain.flatten()[peak])
 
         shift_x = int(x[-2]*domain_points/4)
         shift_y = int(x[-1]*domain_points/4)
