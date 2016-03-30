@@ -43,17 +43,22 @@ fs = nengo.FunctionSpace(nengo.dists.Function(gaussian,
 
 model = nengo.Network(seed=13)
 model.config[nengo.Ensemble].neuron_type = nengo.Direct() #TODO: temp, just use direct for debugging
+ps_neuron_type = nengo.LIF() # neuron type for posecells
 with model:
 
     # Node that handles ROS communication
     # in:  best_x, best_y, best_th
-    # out: vtrans, vrot, stim_x, stim_y, stim_th
-    posecell_node = nengo.Node(NengoPosecellNetwork(), size_in=3, size_out=5)
+    # out: vtrans, vrot, stim_x, stim_y, stim_th, energy
+    if __name__ == '__main__':
+        posecell_node = nengo.Node(NengoPosecellNetwork(), size_in=3, size_out=6)
+    else: # ROS can't register signals within nengo_gui
+        posecell_node = nengo.Node(NengoPosecellNetwork(disable_signals=True), size_in=3, size_out=6)
 
     # Splitting posecell network into x, y, and th components to reduce
     # computational burden. Some representational power is lost, but it is
     # hopefully good enough to still work.
-    posecells_x = nengo.Ensemble(n_neurons=3000, dimensions=fs.n_basis + 1)
+    posecells_x = nengo.Ensemble(n_neurons=3000, dimensions=fs.n_basis + 1,
+                                 neuron_type=ps_neuron_type)
     posecells_x.encoders = nengo.dists.Combined([fs.project(nengo.dists.Function(gaussian,
                                         mean=nengo.dists.Uniform(domain_min,
                                                                  domain_max),
@@ -74,7 +79,8 @@ with model:
                                               [fs.n_basis, 1], weights=[1,1],
                                               normalize_weights=True)
     
-    posecells_y = nengo.Ensemble(n_neurons=3000, dimensions=fs.n_basis + 1)
+    posecells_y = nengo.Ensemble(n_neurons=3000, dimensions=fs.n_basis + 1,
+                                 neuron_type=ps_neuron_type)
     posecells_y.encoders = nengo.dists.Combined([fs.project(nengo.dists.Function(gaussian,
                                         mean=nengo.dists.Uniform(domain_min,
                                                                  domain_max),
@@ -95,7 +101,8 @@ with model:
                                               [fs.n_basis, 1], weights=[1,1],
                                               normalize_weights=True)
     
-    posecells_th = nengo.Ensemble(n_neurons=3000, dimensions=fs.n_basis + 1)
+    posecells_th = nengo.Ensemble(n_neurons=3000, dimensions=fs.n_basis + 1,
+                                  neuron_type=ps_neuron_type)
     posecells_th.encoders = nengo.dists.Combined([fs.project(nengo.dists.Function(gaussian,
                                         mean=nengo.dists.Uniform(domain_min,
                                                                  domain_max),
@@ -228,20 +235,24 @@ with model:
     nengo.Connection(posecell_node[3], stim_y[1])
     nengo.Connection(posecell_node[4], stim_th[1])
 
+    nengo.Connection(posecell_node[5], stim_x[0])
+    nengo.Connection(posecell_node[5], stim_y[0])
+    nengo.Connection(posecell_node[5], stim_th[0])
 
+if __name__ == '__main__':
 
-print( "starting simulator..." )
-before = time.time()
+    print( "starting simulator..." )
+    before = time.time()
 
-sim = nengo.Simulator(model)
+    sim = nengo.Simulator(model)
 
-after = time.time()
-print( "time to build:" )
-print( after - before )
+    after = time.time()
+    print( "time to build:" )
+    print( after - before )
 
-print( "running simulator..." )
-before = time.time()
+    print( "running simulator..." )
+    before = time.time()
 
-while True:
-    sim.step()
-    time.sleep(0.0001)
+    while True:
+        sim.step()
+        time.sleep(0.0001)

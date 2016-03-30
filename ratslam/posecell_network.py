@@ -67,13 +67,14 @@ class PosecellNetwork(object):
                  pc_dim_xy=21, pc_dim_th=36, pc_w_e_dim=7,
                  pc_w_i_dim=5, pc_w_e_var=1, pc_w_i_var=2, pc_global_inhib=0.00002,
                  vt_active_decay=1.0, pc_vt_inject_energy=0.15, pc_cell_x_size=1.0,
-                 exp_delta_pc_threshold=2.0, pc_vt_restore=0.05
+                 exp_delta_pc_threshold=2.0, pc_vt_restore=0.05,
+                 disable_signals=False
                 ):
 
         self.root = root
         self.pc_output = TopologicalAction()
         self.prev_time = rospy.Time() # defaults time to 0
-        rospy.init_node('posecells', anonymous=True)
+        rospy.init_node('posecells', anonymous=True, disable_signals=disable_signals)
 
         self.pub_pc = rospy.Publisher( self.root + '/PoseCell/TopologicalAction',
                                        TopologicalAction
