@@ -14,12 +14,12 @@ nengo.FunctionSpace = nengo.utils.function_space.FunctionSpace
 from nengo_posecell_network import NengoPosecellNetwork
 
 n_basis_1d=10
-n_basis_2d=30
-n_samples=1000
+n_basis_2d=100#30
+n_samples=10000
 domain_min = -1
 domain_max = 1
 domain_range = domain_max - domain_min
-domain_points = 75#2000
+domain_points = 80#75#2000
 domain = np.linspace(domain_min, domain_max, domain_points)
 
 x_domain = np.linspace(domain_min, domain_max, domain_points)
@@ -93,7 +93,7 @@ fs2d = nengo.FunctionSpace(nengo.dists.Function(gaussian2d,
 
 model = nengo.Network(seed=13)
 model.config[nengo.Ensemble].neuron_type = nengo.Direct() #TODO: temp, just use direct for debugging
-ps_neuron_type = nengo.LIF() # neuron type for posecells
+ps_neuron_type = nengo.Direct()#nengo.LIF() # neuron type for posecells
 with model:
 
     # Node that handles ROS communication
@@ -109,7 +109,7 @@ with model:
     # hopefully good enough to still work.
     posecells_xy = nengo.Ensemble(n_neurons=5000, dimensions=fs2d.n_basis + 2,
                                  neuron_type=ps_neuron_type)
-    posecells_xy.encoders = nengo.dists.Combined([fs2d.project(nengo.dists.Function(gaussian,
+    posecells_xy.encoders = nengo.dists.Combined([fs2d.project(nengo.dists.Function(gaussian2d,
                                         mean_x=nengo.dists.Uniform(domain_min,
                                                                  domain_max),
                                         mean_y=nengo.dists.Uniform(domain_min,
@@ -121,7 +121,7 @@ with model:
                                               [fs2d.n_basis, 2], weights=[1,1],
                                               normalize_weights=True)
     
-    posecells_xy.eval_points = nengo.dists.Combined([fs2d.project(nengo.dists.Function(gaussian,
+    posecells_xy.eval_points = nengo.dists.Combined([fs2d.project(nengo.dists.Function(gaussian2d,
                                         mean_x=nengo.dists.Uniform(domain_min,
                                                                  domain_max),
                                         mean_y=nengo.dists.Uniform(domain_min,

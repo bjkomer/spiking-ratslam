@@ -38,7 +38,7 @@ class NengoPosecellNetwork(PosecellNetwork):
     def on_odo(self, vtrans, vrot):
 
         #self.vtrans = vtrans * (PC_DIM_XY / PC_CELL_X_SIZE) *.01 #FIXME multiplying by magic numbers
-        self.vtrans = vtrans * 2#* (PC_DIM_XY / PC_CELL_X_SIZE) *.01 #FIXME multiplying by magic numbers
+        self.vtrans = vtrans * 3#2#* (PC_DIM_XY / PC_CELL_X_SIZE) *.01 #FIXME multiplying by magic numbers
         self.vrot = vrot
         self.odo_update = True
         """
