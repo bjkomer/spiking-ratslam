@@ -239,17 +239,17 @@ with model:
         return domain[peak] * np.pi
 
     def velocity_components(x):
-        # convert trans and rot velocity into x and y components
+        # convert vtrans into x and y components
         return [x[0] * np.cos(x[1]), x[0] * np.sin(x[1])]
     
     def xy_component(x):
-        # convert trans and rot velocity into x and y components
+        # convert vtrans into x and y components
         return [x[0] * np.cos(x[1]), x[0] * np.sin(x[1])]
 
     nengo.Connection(posecells_xy, posecells_xy[:-2], synapse=0.1, function=collapse2d)
     nengo.Connection(posecells_th, posecells_th[:-1], synapse=0.1, function=collapse)
 
-    # velocity in x and y directions, and current theta.
+    # vtrans and current theta.
     velocity_input = nengo.Ensemble(n_neurons=500, dimensions=2) 
     
     nengo.Connection(velocity_input, posecells_xy[-2:], function=xy_component)

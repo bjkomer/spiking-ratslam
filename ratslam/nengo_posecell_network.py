@@ -69,7 +69,8 @@ class NengoPosecellNetwork(PosecellNetwork):
         """
         self.best_x = int(((values[0] + 1) /2) * PC_DIM_XY)
         self.best_y = int(((values[1] + 1) /2) * PC_DIM_XY)
-        self.best_th = int(((values[2] + np.pi) /2) * PC_DIM_TH)
+        #self.best_th = int(((values[2] + np.pi) /2) * PC_DIM_TH)
+        self.best_th = int(((values[2] + 1) /2) * PC_DIM_TH) #TODO: make sure this is correct
 
         energy = self.energy
         self.energy *= .1 # decay on the energy being injected

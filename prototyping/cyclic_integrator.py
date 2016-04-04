@@ -8,23 +8,11 @@ tau = .1
 
 def integrate(x):
 
-    #val = np.arcsin(x[0])
-
-    #return np.sin(val+x[2]), np.cos(val+x[2]), 0
-
     return (x[0] + x[1]*x[2]*tau)*1.1, (x[1] - x[0]*x[2]*tau)*1.1
 
 def decoding(x):
 
     return np.arctan2(x[0], x[1])
-
-    val = x[0]
-    if val > 1:
-        val = 1
-    if val < -1:
-        val = -1
-
-    return np.arcsin(val)
 
 model = nengo.Network(seed=13)
 #model.config[nengo.Ensemble].neuron_type = nengo.Direct() #TODO: temp, just use direct for debugging
