@@ -5,6 +5,7 @@
 import nengo
 import numpy as np
 import time
+import nengo_spinnaker
 
 import nengo.utils.function_space
 nengo.dists.Function = nengo.utils.function_space.Function
@@ -292,12 +293,82 @@ with model:
     nengo.Connection(posecell_node[5], stim_xy[0])
     nengo.Connection(posecell_node[5], stim_th[0])
 
+# replace Ensembles in nengo.Direct mode with Nodes
+def direct_nodes(model):
+    conns = list(model.all_connections)
+    inputs, outputs = nengo.utils.builder.find_all_io(conns)
+    
+    nets = [model] + list(model.all_networks)
+    
+    for net in nets:
+        for ens in list(net.ensembles):
+            if isinstance(ens.neuron_type, nengo.Direct):
+                print 'replacing', ens
+            
+                with net:
+                    node = nengo.Node(output=lambda t, x: x,
+                                      size_in=ens.dimensions,
+                                      label=ens.label)
+                    inputs[node] = []
+                    outputs[node] = []
+                
+                if ens in inputs:
+                    for c in inputs[ens]:
+                        for cnet in nets:
+                            if c in cnet.connections:
+                                with cnet:
+                                    new_c = nengo.Connection(c.pre, 
+                                                             node[c.post_slice],
+                                                             function=c.function, 
+                                                             transform=c.transform,
+                                                             synapse=c.synapse)
+                                outputs[c.pre_obj].remove(c)
+                                outputs[c.pre_obj].append(new_c)
+                                inputs[node].append(new_c)
+                                cnet.connections.remove(c)
+                                break
+                        else:
+                            print('Error processing %s' % ens)
+                        
+                if ens in outputs:
+                    for c in outputs[ens]:
+                        for cnet in nets:
+                            if c in cnet.connections:
+                                with cnet:
+                                    new_c = nengo.Connection(node[c.pre_slice], 
+                                                             c.post,
+                                                             function=c.function, 
+                                                             transform=c.transform,
+                                                             synapse=c.synapse)
+                                inputs[c.post_obj].remove(c)
+                                inputs[c.post_obj].append(new_c)
+                                outputs[node].append(new_c)
+                                cnet.connections.remove(c)
+                                break
+                        else:
+                            print('Error processing %s' % ens)
+                        
+                net.ensembles.remove(ens)
+    return model                
+
+# replace passthrough Nodes with equivalent Nodes (so they're run on the PC, not SpiNNaker)
+def replace_passthrough(model):                
+    for node in model.all_nodes:
+        if node.output is None:
+            node.output = lambda t, x: x                
+    return model
+
+model = direct_nodes(model)
+model = replace_passthrough(model)
+
+nengo_spinnaker.add_spinnaker_params(model.config)
+
 if __name__ == '__main__':
 
     print( "starting simulator..." )
     before = time.time()
 
-    sim = nengo.Simulator(model)
+    sim = nengo_spinnaker.Simulator(model)
 
     after = time.time()
     print( "time to build:" )
@@ -305,7 +376,7 @@ if __name__ == '__main__':
 
     print( "running simulator..." )
     before = time.time()
+    
+    with sim:
+        sim.run(1000)
 
-    while True:
-        sim.step()
-        time.sleep(0.0001)

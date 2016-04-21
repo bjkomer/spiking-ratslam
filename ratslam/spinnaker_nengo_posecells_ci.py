@@ -9,7 +9,7 @@ import nengo_spinnaker
 
 from nengo_posecell_network import NengoPosecellNetwork
 
-n_neurons=500#2000
+n_neurons=500#1000#2000
 tau = .1
 
 def integrate(x):
@@ -34,7 +34,7 @@ def y_component(x):
     return x[0] * np.sin(x[1])
 
 model = nengo.Network(seed=13)
-model.config[nengo.Ensemble].neuron_type = nengo.Direct() #TODO: temp, just use direct for debugging
+#model.config[nengo.Ensemble].neuron_type = nengo.Direct() #TODO: temp, just use direct for debugging
 ps_neuron_type = nengo.LIF() # neuron type for posecells
 with model:
 

@@ -8,7 +8,7 @@ import time
 
 from nengo_posecell_network import NengoPosecellNetwork
 
-n_neurons=500#2000
+n_neurons=2500#500#2#500#2000
 tau = .1
 
 def integrate(x):

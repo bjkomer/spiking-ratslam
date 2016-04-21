@@ -137,7 +137,7 @@ class PosecellNetwork(object):
         #self.on_odo(vtrans*time_diff, vrot*time_diff)
         self.on_odo(vtrans, vrot) #FIXME: removing time diff multiplication for now
         self.pc_output.action = self.get_action()
-        
+
         # Only publish a message if there is an action
         if self.pc_output.action != NO_ACTION:
 
@@ -149,7 +149,7 @@ class PosecellNetwork(object):
             self.pub_pc.publish(self.pc_output)
 
         self.prev_time = odo.header.stamp
-
+    
     def on_odo(self, vtrans, vrot):
 
         self.excite()
@@ -160,7 +160,7 @@ class PosecellNetwork(object):
         self.find_best()
         self.odo_update = True
         self.display = np.copy(self.posecells)
-
+    
     def template_callback(self, vt):
 
         self.on_view_template(vt.current_id, vt.relative_rad)
@@ -491,6 +491,7 @@ class PosecellNetwork(object):
         if len(self.visual_templates) == 0:
             return action # NO_ACTION
         
+        #if True: #TEMP FIXME - using only odometry for plot
         if len(self.experiences) == 0:
             self.create_experience()
             action = CREATE_NODE
